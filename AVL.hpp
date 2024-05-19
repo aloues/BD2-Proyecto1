@@ -30,7 +30,7 @@ public:
     long right = -1;
     int height = 0;
 
-    void print() {
+    void print() const{
         cout << key << ';'
              << job_title << ';'
              << salary_estimate << ';'
