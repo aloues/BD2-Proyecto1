@@ -266,4 +266,3 @@ puntos posible a ver:
 ## Enlaces de interés
 - **Link proyecto word:** [Google Drive](https://docs.google.com/document/d/1vadt2WTfk3kzQxVkr5JO7ioLIMwdiF08qMULMHMZG9o/edit?usp=sharing)
 - **Video explicativo:** [YouTube](#)
-```
