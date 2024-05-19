@@ -36,17 +36,167 @@ El archivo AVL utiliza un árbol binario de búsqueda autoequilibrado para mante
 
 #### Algoritmos de inserción, eliminación y búsqueda:
 - **Inserción:** Se añade un nuevo registro manteniendo el equilibrio del árbol para asegurar eficiencia.
+
+```cpp
+template <class T, typename TK>
+void AVLFile<T, TK>::insert(long pos_node, T record, fstream& file) {
+    if (pos_node == -1) {
+        file.seekp(0, ios::end);
+        long pos = file.tellp();
+        file.write(reinterpret_cast<const char*>(&record), sizeof(T));
+        if (this->pos_root == -1) {
+            this->pos_root = pos;
+            file.seekp(0, ios::beg);
+            file.write(reinterpret_cast<const char*>(&this->pos_root), sizeof(long));
+        }
+        return;
+    }
+
+    file.seekg(pos_node, ios::beg);
+    T node;
+    file.read(reinterpret_cast<char*>(&node), sizeof(T));
+
+    if (less(record, node)) {
+        if (node.left == -1) {
+            file.seekp(0, ios::end);
+            long pos = file.tellp();
+            node.left = pos;
+            file.write(reinterpret_cast<const char*>(&record), sizeof(T));
+            file.seekp(pos_node, ios::beg);
+            file.write(reinterpret_cast<const char*>(&node), sizeof(T));
+        } else {
+            insert(node.left, record, file);
+        }
+    } else if (greater(record, node)) {
+        if (node.right == -1) {
+            file.seekp(0, ios::end);
+            long pos = file.tellp();
+            node.right = pos;
+            file.write(reinterpret_cast<const char*>(&record), sizeof(T));
+            file.seekp(pos_node, ios::beg);
+            file.write(reinterpret_cast<const char*>(&node), sizeof(T));
+        } else {
+            insert(node.right, record, file);
+        }
+    }
+
+    balance(pos_node, file);
+}
+```
+
 - **Eliminación:** El registro se elimina y se efectúa un rebalanceo del árbol para mantener la eficiencia de futuras operaciones.
+
+```cpp
+template <class T, typename TK>
+bool AVLFile<T, TK>::remove(long pos_node, TK key, fstream& file) {
+    if (pos_node == -1) {
+        return false;
+    }
+
+    file.seekg(pos_node, ios::beg);
+    T node;
+    file.read(reinterpret_cast<char*>(&node), sizeof(T));
+
+    if (equal_key(node, key)) {
+        if (node.left == -1 || node.right == -1) {
+            long temp = (node.left != -1) ? node.left : node.right;
+            if (pos_node == this->pos_root) {
+                this->pos_root = temp;
+                file.seekp(0, ios::beg);
+                file.write(reinterpret_cast<const char*>(&this->pos_root), sizeof(long));
+            } else {
+                file.seekp(pos_node, ios::beg);
+                file.write(reinterpret_cast<const char*>(&temp), sizeof(long));
+            }
+        } else {
+            long min_node = findMinNode(node.right, file);
+            file.seekg(min_node, ios::beg);
+            T min_node_record;
+            file.read(reinterpret_cast<char*>(&min_node_record), sizeof(T));
+            node = min_node_record;
+            file.seekp(pos_node, ios::beg);
+            file.write(reinterpret_cast<const char*>(&node), sizeof(T));
+            remove(node.right, get_key(node), file);
+        }
+        balance(pos_node, file);
+        return true;
+    }
+    
+    if (less_key(node, key)) {
+        bool result = remove(node.right, key, file);
+        balance(pos_node, file);
+        return result;
+    } else {
+        bool result = remove(node.left, key, file);
+        balance(pos_node, file);
+        return result;
+    }
+}
+
+```
+
 - **Búsqueda:** Se realiza de forma binaria, aprovechando la estructura equilibrada del árbol.
+
+```cpp
+template <class T, typename TK>
+T AVLFile<T, TK>::find(long pos_node, TK key, fstream& file) const {
+    if (pos_node == -1) {
+        throw runtime_error("Record not found");
+    }
+
+    file.seekg(pos_node, ios::beg);
+    T node;
+    file.read(reinterpret_cast<char*>(&node), sizeof(T));
+
+    if (equal_key(node, key)) {
+        return node;
+    } else if (less_key(node, key)) {
+        return find(node.right, key, file);
+    } else {
+        return find(node.left, key, file);
+    }
+}
+
+```
 
 ### B+Tree Index
 #### Descripción de la técnica:
-
+El árbol B+ es una estructura de datos de árbol balanceado que permite búsquedas, inserciones y eliminaciones eficientes y mantiene los datos ordenados. Para permitir recorridos secuenciales rápidos, los nodos hoja del árbol B+ están enlazados. Los sistemas de bases de datos y de archivos se benefician especialmente de esta estructura.
 
 #### Algoritmos de inserción, eliminación y búsqueda:
-- **Inserción:** 
-- **Eliminación:** 
-- **Búsqueda:** 
+- **Inserción:** Se agrega un nuevo registro al nodo de la hoja adecuado. La división se propaga hacia arriba en el árbol si el nodo de la hoja se llena.
+- **Eliminación:** Se elimina un registro del nodo hoja correspondiente. Si el nodo hoja queda con muy pocos elementos, se combina con un nodo hermano o se redistribuyen los elementos.
+- **Búsqueda:** Se realiza una búsqueda binaria en los nodos internos y una búsqueda secuencial en los nodos hoja.
+
+```cpp
+template <typename TK>
+Record BPlusTree<TK>::search(TK key) {
+    if (metadata.rootPos == -1) return Record();
+    return searchRec(key, metadata.rootPos);
+}
+
+template <typename TK>
+Record BPlusTree<TK>::searchRec(TK key, long nodePos) {
+    PageIndex node = readPageIndex(nodePos);
+
+    int i = 0;
+
+    while (i < node.count && key > node.entries[i]) {
+        i++;
+    }
+
+    if (node.entries[i] == key) {
+        long address = node.values[i];
+        return readRecord(address);
+    }
+
+    if (node.is_leaf) {
+        return Record();
+    } else {
+        return searchRec(key, node.children[i]);
+    }
+}
+```
 
 ### Extendible Hashing
 #### Descripción de la técnica:
