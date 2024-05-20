@@ -3,7 +3,6 @@
 ## Autores
 - **Nombre:** Luis Izaguirre
 - **Nombre:** Ernesto Ormeño
-- **Nombre:** Ximena Lindo
 - **Nombre:** Aleksander Paico
 
 
